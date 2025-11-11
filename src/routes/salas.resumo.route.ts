@@ -64,7 +64,6 @@ export default async function salaResumoRoute(app: FastifyInstance) {
     app.get('/resumo', async () => {
         const salas = await prisma.sala.findMany({ orderBy: { id: 'asc' } });
 
-        // Para evitar N queries por sala, você pode optar por um loop com Promise.all:
         const itens = await Promise.all(salas.map(async (s) => {
             const [ocup, t, i, w] = await Promise.all([
                 prisma.pessoaEmSala.count({ where: { salaId: s.id } }),

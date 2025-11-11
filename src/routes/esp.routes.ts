@@ -1,6 +1,11 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod';
 import { prisma } from '../repositories/prisma';
+import {
+  espMovimentacaoSchema,
+  espEstadoSchema,
+  type EspMovimentacaoInput,
+  type EspEstadoInput,
+} from '../schemas/esp.schema';
 
 async function resolveSalaByToken(tokenEsp: string) {
   const sala = await prisma.sala.findFirst({ where: { tokenEsp } });
@@ -9,37 +14,59 @@ async function resolveSalaByToken(tokenEsp: string) {
 }
 
 export default async function espRoutes(app: FastifyInstance) {
-  // POST /esp/movimentacao – cria OU deleta uma PessoaEmSala e registra a nova ocupação
-  const movSchema = z.object({
-    tokenEsp: z.string().length(32),
-    numeroCartao: z.string().min(1).max(15),
-    acao: z.enum(['enter', 'exit']), 
-    timestamp: z.coerce.date().optional(),
-  });
-
   app.post('/movimentacao', async (req, rep) => {
-    const { tokenEsp, numeroCartao, acao, timestamp } = movSchema.parse(req.body);
+    const { tokenEsp, numeroCartao, acao, timestamp } =
+      espMovimentacaoSchema.parse(req.body) as EspMovimentacaoInput;
+
     const sala = await resolveSalaByToken(tokenEsp);
+    const ts = timestamp ?? new Date();
 
     try {
-      await prisma.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx) => {
+        const presencaEmAlgumaSala = await tx.pessoaEmSala.findFirst({
+          where: { numeroCartao },
+          select: { salaId: true },
+        });
+
         if (acao === 'enter') {
+          if (presencaEmAlgumaSala && presencaEmAlgumaSala.salaId !== sala.id) {
+            return { ok: false, status: 409 as const, code: 'CARTAO_EM_OUTRA_SALA' };
+          }
+
           await tx.pessoaEmSala.upsert({
             where: { numeroCartao_salaId: { numeroCartao, salaId: sala.id } },
-            update: { timestamp: timestamp ?? new Date() },
-            create: { salaId: sala.id, numeroCartao, timestamp: timestamp ?? new Date() },
+            update: { timestamp: ts },
+            create: { numeroCartao, salaId: sala.id, timestamp: ts },
           });
         } else {
-          await tx.pessoaEmSala.deleteMany({
-            where: { numeroCartao, salaId: sala.id },
+          const presenteNestaSala = await tx.pessoaEmSala.findUnique({
+            where: { numeroCartao_salaId: { numeroCartao, salaId: sala.id } },
+            select: { numeroCartao: true },
+          });
+
+          if (!presenteNestaSala) {
+            return { ok: false, status: 409 as const, code: 'NAO_ESTA_NA_SALA' };
+          }
+
+          await tx.pessoaEmSala.delete({
+            where: { numeroCartao_salaId: { numeroCartao, salaId: sala.id } },
           });
         }
 
         const total = await tx.pessoaEmSala.count({ where: { salaId: sala.id } });
-        await tx.ocupacao.create({
-          data: { salaId: sala.id, ocupacao: total, timestamp: timestamp ?? new Date() },
-        });
+        await tx.ocupacao.create({ data: { salaId: sala.id, ocupacao: total, timestamp: ts } });
+
+        return { ok: true, status: 201 as const };
       });
+
+      if (!result.ok) {
+        if (result.code === 'CARTAO_EM_OUTRA_SALA') {
+          return rep.code(result.status).send({ message: 'O cartão já está presente em outra sala.', code: result.code });
+        }
+        if (result.code === 'NAO_ESTA_NA_SALA') {
+          return rep.code(result.status).send({ message: 'Ação de saída inválida: o cartão não está nesta sala.', code: result.code });
+        }
+      }
 
       return rep.code(201).send({ ok: true });
     } catch (e: any) {
@@ -49,19 +76,10 @@ export default async function espRoutes(app: FastifyInstance) {
     }
   });
 
-  // POST /esp/estado – recebe o estado atual da sala e grava leituras
-  const estadoSchema = z.object({
-    tokenEsp: z.string().length(32),
-    timestamp: z.coerce.date().optional(),
-    temperatura: z.number().optional(),
-    internetVel: z.number().optional(),
-    wifiVel: z.number().optional(),
-    ocupacao: z.number().int().nonnegative().optional(),
-  });
-
   app.post('/estado', async (req, rep) => {
     const { tokenEsp, timestamp, temperatura, internetVel, wifiVel, ocupacao } =
-      estadoSchema.parse(req.body);
+      espEstadoSchema.parse(req.body) as EspEstadoInput;
+
     const sala = await resolveSalaByToken(tokenEsp);
 
     try {
@@ -77,7 +95,6 @@ export default async function espRoutes(app: FastifyInstance) {
         if (typeof wifiVel === 'number') {
           await tx.wifi.create({ data: { salaId: sala.id, velocidade: wifiVel, timestamp: ts } });
         }
-
         if (typeof ocupacao === 'number') {
           await tx.ocupacao.create({ data: { salaId: sala.id, ocupacao, timestamp: ts } });
         }
