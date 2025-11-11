@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Sala {
+  id        Int        @id @default(autoincrement())
+  nome      String     @db.VarChar(45)
+  vagas     Int
+  tokenEsp  String     @db.Char(32)
+
+  // Relações (1:N)
+  temperaturas Temperatura[]
+  internets    Internet[]
+  wifis        Wifi[]
+  ocupacoes    Ocupacao[]
+  pessoas      PessoaEmSala[]
+
+  @@index([nome])
+}
+
+model Temperatura {
+  id         Int       @id @default(autoincrement())
+  salaId     Int
+  temperatura Float
+  timestamp  DateTime  @default(now())
+
+  sala Sala @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  @@index([salaId, timestamp])
+}
+
+model Internet {
+  id        Int       @id @default(autoincrement())
+  salaId    Int
+  velocidade Float
+  timestamp DateTime  @default(now())
+
+  sala Sala @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  @@index([salaId, timestamp])
+}
+
+model Wifi {
+  id        Int       @id @default(autoincrement())
+  salaId    Int
+  velocidade Float
+  timestamp DateTime  @default(now())
+
+  sala Sala @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  @@index([salaId, timestamp])
+}
+
+model PessoaEmSala {
+  id           Int      @id @default(autoincrement())
+  numeroCartao String   @db.VarChar(15)
+  salaId       Int
+  // Opcional: carimbo de quando foi registrada a presença
+  timestamp    DateTime @default(now())
+
+  sala Sala @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  @@unique([numeroCartao, salaId]) // evita duplicidade do mesmo cartão na mesma sala
+  @@index([salaId])
+}
+
+model Ocupacao {
+  id        Int      @id @default(autoincrement())
+  salaId    Int
+  ocupacao  Int      // número de pessoas ocupando no momento
+  timestamp DateTime @default(now())
+
+  sala Sala @relation(fields: [salaId], references: [id], onDelete: Cascade)
+  @@index([salaId, timestamp])
+}

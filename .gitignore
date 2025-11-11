@@ -1,0 +1,76 @@
+# --- Node / Gerenciadores de pacotes ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Mantenha o lockfile versionado (recomendado)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# --- TypeScript / Build ---
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# --- Testes / Cobertura ---
+coverage/
+.nyc_output/
+
+# --- Variáveis de ambiente e segredos ---
+.env
+.env.*
+!.env.example            # deixe um exemplo sem segredos
+*.env.local
+*.envrc
+*.pem
+*.key
+*.crt
+*.p12
+*.cert
+
+# --- Prisma ---
+# (mantenha as migrações versionadas)
+!prisma/migrations/
+# bancos locais de desenvolvimento (SQLite) e artefatos
+prisma/*.db
+prisma/*.sqlite
+prisma/*.sqlite-journal
+prisma/*.db-journal
+# se você gera tipos/artefatos fora de node_modules
+/generated/prisma/
+
+# --- Logs / Runtime ---
+logs/
+*.log
+*.pid
+*.pid.lock
+
+# --- Caches / Temporários ---
+.eslintcache
+.turbo/
+.cache/
+.tmp/
+tmp/
+temp/
+
+# --- Docker (opcional) ---
+.docker/
+docker-data/
+docker-compose.override.yml
+
+# --- Editor / SO ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json  # opcional: sugerir extensões do projeto
+# !.vscode/settings.json  # descomente se quiser versionar configurações do workspace
+
+# --- Backups / Arquivos provisórios ---
+*.bak
+*.old
+*.swp
