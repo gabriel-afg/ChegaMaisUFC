@@ -1,10 +1,13 @@
+import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import { env } from './env';
-import salasRoutes from './routes/salas.routes';
 import espRoutes from './routes/esp.routes';
 import salaResumoRoute from './routes/salas.resumo.route';
+import salasRoutes from './routes/salas.routes';
 
 const app = Fastify({ logger: true });
+
+app.register(cors, {origin: '*',});
 
 app.register(salasRoutes, { prefix: '/salas' });
 app.register(espRoutes, { prefix: '/esp' });
